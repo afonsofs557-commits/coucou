@@ -67,7 +67,9 @@ pub struct Settings {
     /// the Rust side (desktop.rs) — what a webview sends back is ignored.
     pub desktop_mochi: DesktopMochiPref,
     /// Custom position offset for the island window (draggable)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub island_offset_x: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub island_offset_y: Option<f64>,
 }
 
