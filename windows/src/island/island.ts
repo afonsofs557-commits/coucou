@@ -103,6 +103,8 @@ export class Island {
 
   /** Where a press on Mochi started: moving past DRAG_THRESHOLD drags him out. */
   private botPress: { x: number; y: number } | null = null;
+  private islandDragPress: { screenX: number; screenY: number } | null = null;
+  private isDraggingIsland = false;
 
   /** Drop sequence bookkeeping: last tick played, and whether the ✓ has fired. */
   private uploadTens = 0;
@@ -701,6 +703,7 @@ export class Island {
       // A press on Mochi may become a drag out to the desktop.
       if (e.button === 0 && this.isBotHit(e.clientX, e.clientY)) {
         this.botPress = { x: e.clientX, y: e.clientY };
+        return;
       }
       // Right-click on Mochi opens the wardrobe, and closes it again.
       if (e.button === 2 && this.isBotHit(e.clientX, e.clientY)) {
@@ -708,13 +711,23 @@ export class Island {
         this.toggleWardrobe();
         return;
       }
-      if (State.mode !== "expanded") {
-        this.fsm.click();
-        return;
+      // Left-click on the island (outside Mochi and interactive inputs) allows dragging
+      if (e.button === 0) {
+        const target = e.target as HTMLElement | null;
+        if (!target?.closest("button, input, textarea, a, select, [data-interactive]")) {
+          this.islandDragPress = { screenX: e.screenX, screenY: e.screenY };
+        }
       }
-      if (this.isBotHit(e.clientX, e.clientY)) {
+      if (this.isBotHit(e.clientX, e.clientY) && State.mode === "expanded") {
         this.cancelBotHover();
         this.engine.slap();
+      }
+    });
+
+    // Double-click on island (outside Mochi) resets position to top-center
+    this.islandEl.addEventListener("dblclick", (e) => {
+      if (!this.isBotHit(e.clientX, e.clientY)) {
+        void Bridge.resetIslandOffset();
       }
     });
 
@@ -724,8 +737,21 @@ export class Island {
       if (this.isBotHit(e.clientX, e.clientY)) e.preventDefault();
     });
 
-    // Dragging Mochi out of the island puts him on the desktop.
+    // Dragging Mochi out of the island puts him on the desktop, or dragging the island moves it.
     window.addEventListener("mousemove", (e) => {
+      if (this.islandDragPress && (e.buttons & 1)) {
+        const dx = e.screenX - this.islandDragPress.screenX;
+        const dy = e.screenY - this.islandDragPress.screenY;
+        if (!this.isDraggingIsland && Math.hypot(dx, dy) > 4) {
+          this.isDraggingIsland = true;
+        }
+        if (this.isDraggingIsland) {
+          this.islandDragPress = { screenX: e.screenX, screenY: e.screenY };
+          void Bridge.moveIsland(dx, dy);
+          return;
+        }
+      }
+
       if (this.desktop.carrying) {
         this.desktop.carry(e.clientX, e.clientY);
         return;
@@ -745,6 +771,19 @@ export class Island {
     window.addEventListener("mouseup", (e) => {
       this.botPress = null;
       if (this.desktop.carrying) this.desktop.carryEnd(e.clientX, e.clientY);
+
+      if (this.isDraggingIsland) {
+        this.isDraggingIsland = false;
+        this.islandDragPress = null;
+        void Bridge.saveIslandOffset();
+        return;
+      }
+      if (this.islandDragPress) {
+        this.islandDragPress = null;
+        if (State.mode !== "expanded") {
+          this.fsm.click();
+        }
+      }
     });
 
     // Only keys typed into the island itself land here, never Escape typed in

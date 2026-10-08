@@ -174,6 +174,57 @@ fn reposition(app: AppHandle, shared: State<Shared>) {
     island::apply_geometry(&app, &pref, collapsed);
 }
 
+#[tauri::command]
+fn move_island(app: AppHandle, dx: f64, dy: f64) {
+    let Some(win) = island::window(&app) else { return };
+    if let Ok(pos) = win.outer_position() {
+        let new_x = pos.x + dx.round() as i32;
+        let new_y = pos.y + dy.round() as i32;
+        let _ = win.set_position(tauri::PhysicalPosition::new(new_x, new_y));
+    }
+}
+
+#[tauri::command]
+fn save_island_offset(app: AppHandle, shared: State<Shared>) {
+    let Some(win) = island::window(&app) else { return };
+    let Ok(pos) = win.outer_position() else { return };
+    let pref = shared.settings.lock().unwrap().screen.clone();
+    let Some(m) = island::target_monitor(&app, &pref) else { return };
+    let scale = m.scale_factor();
+    let mp = *m.position();
+    let ms = *m.size();
+    let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
+    let (lw, _) = if collapsed { (island::STRIP_W, island::STRIP_H) } else { (island::PANEL_W, island::PANEL_H) };
+    let pw = (lw * scale).round() as i32;
+    let centered_x = mp.x + (ms.width as i32 - pw) / 2;
+    let default_y = mp.y;
+
+    let offset_x = (pos.x - centered_x) as f64 / scale;
+    let offset_y = (pos.y - default_y) as f64 / scale;
+
+    let mut settings = shared.settings.lock().unwrap();
+    settings.island_offset_x = Some(offset_x);
+    settings.island_offset_y = Some(offset_y);
+    if let Err(err) = settings::save(&settings) {
+        log::line(format!("could not save island offset: {err}"));
+    }
+}
+
+#[tauri::command]
+fn reset_island_offset(app: AppHandle, shared: State<Shared>) {
+    let pref = {
+        let mut settings = shared.settings.lock().unwrap();
+        settings.island_offset_x = None;
+        settings.island_offset_y = None;
+        if let Err(err) = settings::save(&settings) {
+            log::line(format!("could not save island offset: {err}"));
+        }
+        settings.screen.clone()
+    };
+    let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
+    island::apply_geometry(&app, &pref, collapsed);
+}
+
 /// The displays the island can be pinned to, for Settings.
 #[tauri::command]
 fn list_monitors(app: AppHandle) -> Vec<island::MonitorChoice> {
@@ -654,6 +705,9 @@ pub fn run() {
             set_island_rect,
             focus_window,
             reposition,
+            move_island,
+            save_island_offset,
+            reset_island_offset,
             list_monitors,
             open_url,
             open_in_vscode,

@@ -148,6 +148,8 @@ export interface Settings {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
   };
+  islandOffsetX?: number | null;
+  islandOffsetY?: number | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {

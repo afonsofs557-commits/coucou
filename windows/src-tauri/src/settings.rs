@@ -66,6 +66,9 @@ pub struct Settings {
     /// Mochi on the desktop: whether he lives there, and his spot. Owned by
     /// the Rust side (desktop.rs) — what a webview sends back is ignored.
     pub desktop_mochi: DesktopMochiPref,
+    /// Custom position offset for the island window (draggable)
+    pub island_offset_x: Option<f64>,
+    pub island_offset_y: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -120,6 +123,8 @@ impl Default for Settings {
             pill_colors: BTreeMap::new(),
             language: String::new(),
             desktop_mochi: DesktopMochiPref::default(),
+            island_offset_x: None,
+            island_offset_y: None,
         }
     }
 }

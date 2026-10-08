@@ -52,6 +52,9 @@ export const Bridge = {
   focusWindow: (focused: boolean) => call<void>("focus_window", { focused }),
 
   reposition: () => call<void>("reposition"),
+  moveIsland: (dx: number, dy: number) => call<void>("move_island", { dx, dy }),
+  saveIslandOffset: () => call<void>("save_island_offset"),
+  resetIslandOffset: () => call<void>("reset_island_offset"),
 
   /** Displays the island can be pinned to: `key` is what `settings.screen` stores. */
   listMonitors: () => call<{ key: string; label: string }[]>("list_monitors"),

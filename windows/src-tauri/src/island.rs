@@ -219,7 +219,7 @@ fn pick_display(pref: &str, displays: &[DisplayId]) -> Option<usize> {
 
 /// The display the island lives on: a chosen one, the primary one, or the one
 /// under the cursor.
-fn target_monitor(app: &AppHandle, pref: &str) -> Option<Monitor> {
+pub(crate) fn target_monitor(app: &AppHandle, pref: &str) -> Option<Monitor> {
     let monitors = app.available_monitors().ok()?;
     let ids: Vec<DisplayId> = monitors.iter().map(describe).collect();
     if let Some(i) = pick_display(pref, &ids) {
@@ -310,8 +310,26 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
     let (lw, lh) = if collapsed { (STRIP_W, STRIP_H) } else { (PANEL_W, PANEL_H) };
     let pw = (lw * scale).round().max(1.0) as u32;
     let ph = (lh * scale).round().max(1.0) as u32;
-    let x = mp.x + (ms.width as i32 - pw as i32) / 2;
-    let y = mp.y;
+
+    let (offset_x, offset_y) = app
+        .try_state::<crate::Shared>()
+        .map(|s| {
+            let st = s.settings.lock().unwrap();
+            (st.island_offset_x, st.island_offset_y)
+        })
+        .unwrap_or((None, None));
+
+    let centered_x = mp.x + (ms.width as i32 - pw as i32) / 2;
+    let default_y = mp.y;
+
+    let x = match offset_x {
+        Some(ox) => centered_x + (ox * scale).round() as i32,
+        None => centered_x,
+    };
+    let y = match offset_y {
+        Some(oy) => default_y + (oy * scale).round() as i32,
+        None => default_y,
+    };
 
     // GTK never sizes a non-resizable window below its natural size (200 px
     // here), so on Linux the 6 px wake strip would stay a 200 px block. tao
